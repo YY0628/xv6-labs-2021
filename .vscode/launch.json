@@ -1,0 +1,97 @@
+// //launch.json
+// {
+//     "version": "0.2.0",
+//     "configurations": [
+//         {
+//             "name": "debug xv6",
+//             "type": "cppdbg",
+//             "request": "launch",
+//             "program": "${workspaceFolder}/kernel/kernel",
+//             "args": [],
+//             "stopAtEntry": true,
+//             "cwd": "${workspaceFolder}",
+//             "miDebuggerServerAddress": "127.0.0.1:26000",
+//             //这里实际上可以用各种能调试的gdb，如果找不到你可以使用which gdb-multiarch
+//             "miDebuggerPath": "/usr/bin/gdb-multiarch",
+//             "environment": [],
+//             "externalConsole": false,
+//             "MIMode": "gdb",
+//             "preLaunchTask": "xv6build",
+//             "setupCommands": [
+//                 {
+//                     "description": "pretty printing",
+//                     "text": "-enable-pretty-printing",
+//                     "ignoreFailures": true,
+//                 },
+//             ],
+//             //用于gdb调试的工具，可以发现gdb出错的原因
+//             // "logging": {
+//             //     "engineLogging": true,
+//             //     "programOutput": true,
+//             // }
+//         }
+//     ]
+// }
+
+{
+"version": "0.2.0",
+    "configurations": [
+        {
+            "name": "(gdb) 启动",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/kernel/kernel", //可执行程序
+            "args": [],
+            "stopAtEntry": false,
+            "cwd": "${fileDirname}",
+            "environment": [],
+            "externalConsole": false,
+            "MIMode": "gdb",
+            "miDebuggerPath": "/usr/bin/gdb-multiarch", //使用的gdb路径
+            "miDebuggerServerAddress": "localhost:26000",//连接gebsever的ip和端口
+            "setupCommands": [
+                {
+                    "description": "为 gdb 启用整齐打印",
+                    "text": "-enable-pretty-printing",
+                    "ignoreFailures": true
+                },
+                {
+                    "description": "将反汇编风格设置为 Intel",
+                    "text": "-gdb-set disassembly-flavor intel",
+                    "ignoreFailures": true
+                }
+            ]
+        },
+    ]
+}
+
+// {
+//     "version": "0.2.0",
+//     "configurations": [
+//         {
+//             "name": "debug xv6",
+//             "type": "cppdbg",
+//             "request": "launch",
+//             "program": "${workspaceFolder}/kernel/kernel",
+//             "args": [],
+//             "stopAtEntry": true,
+//             "cwd": "${fileDirname}",
+//             "miDebuggerServerAddress": "localhost:26000",
+//             "miDebuggerPath": "/usr/bin/gdb-multiarch", //使用的gdb路径
+//             "environment": [],
+//             "externalConsole": false,
+//             "MIMode": "gdb",
+//             "setupCommands": [
+//                 {
+//                     "description": "pretty printing",
+//                     "text": "-enable-pretty-printing",
+//                     "ignoreFailures": true
+//                 }
+//             ],
+//             "logging": {
+//                 // "engineLogging": true,
+//                 // "programOutput": true,
+//             }
+//         }
+//     ]
+// }

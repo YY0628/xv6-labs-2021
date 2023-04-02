@@ -1,0 +1,16 @@
+{
+    "files.associations": {
+        "user.h": "c",
+        "types.h": "c",
+        "cstdlib": "c",
+        "stat.h": "c",
+        "fs.h": "c",
+        "param.h": "c",
+        "syscall.h": "c",
+        "proc.h": "c",
+        "sysinfo.h": "c",
+        "spinlock.h": "c",
+        "memlayout.h": "c"
+    },
+    "C_Cpp.errorSquiggles": "enabled"
+}
