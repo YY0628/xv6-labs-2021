@@ -101,7 +101,7 @@ walk(pagetable_t pagetable, uint64 va, int alloc)
 // or 0 if not mapped.
 // Can only be used to look up user pages.
 uint64
-walkaddr(pagetable_t pagetable, uint64 va)
+walkaddr(pagetable_t pagetable, uint64 va)    // 找到的是页表地址，没有计算偏移
 {
   pte_t *pte;
   uint64 pa;
