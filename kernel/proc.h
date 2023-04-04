@@ -105,4 +105,9 @@ struct proc {
   struct file *ofile[NOFILE];  // Open files
   struct inode *cwd;           // Current directory
   char name[16];               // Process name (debugging)
+
+  int interval;     // 时钟中断总数
+  int ticks;        // 时钟中断计数
+  uint64 handler;   // 处理函数
+  struct trapframe *trapframe2;   // 用于保存时钟中断后的 内核现场保护
 };

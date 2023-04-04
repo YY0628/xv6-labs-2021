@@ -78,7 +78,21 @@ usertrap(void)
 
   // give up the CPU if this is a timer interrupt.
   if(which_dev == 2)
-    yield();
+  {
+    if (p->interval <= 0)
+      goto yield;
+    
+    p->ticks++;   // 计数
+    if (p->ticks == p->interval)
+    {
+      // 保护内核现场
+      *p->trapframe2 = *p->trapframe;
+      p->trapframe->epc = p->handler;     // 将处理函数的地址赋给陷进帧的epc字段，在sret时，会由其恢复用户pc
+    }
+
+  yield:
+    yield();    // 放弃CPU所有权，所有进程重新竞争
+  }
 
   usertrapret();
 }

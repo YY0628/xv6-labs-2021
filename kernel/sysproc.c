@@ -100,3 +100,36 @@ sys_uptime(void)
   release(&tickslock);
   return xticks;
 }
+
+
+uint64
+sigalarm(void)
+{
+  int interval;
+  uint64 handler;
+  struct proc* p;
+
+  if (argint(0, &interval)<0 || argaddr(1, &handler)<0)
+  {
+    printf("sigalarm arg wrong!\n");
+    return -1;
+  }
+
+  p = myproc();
+  p->interval = interval;
+  p->handler = handler;
+
+  return 0;
+}
+
+uint64
+sigreturn(void)
+{
+  struct proc* p;
+  p = myproc();
+
+  *p->trapframe = *p->trapframe2;
+  p->ticks = 0;
+  return 0;
+}
+

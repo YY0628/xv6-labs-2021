@@ -120,12 +120,23 @@ found:
   p->pid = allocpid();
   p->state = USED;
 
+  // 时钟中断计数 初始化
+  p->ticks = 0;
+
   // Allocate a trapframe page.
   if((p->trapframe = (struct trapframe *)kalloc()) == 0){
     freeproc(p);
     release(&p->lock);
     return 0;
   }
+
+  // 时钟中断保护
+  if((p->trapframe2 = (struct trapframe *)kalloc()) == 0){
+    freeproc(p);
+    release(&p->lock);
+    return 0;
+  }
+
 
   // An empty user page table.
   p->pagetable = proc_pagetable(p);
@@ -152,7 +163,13 @@ freeproc(struct proc *p)
 {
   if(p->trapframe)
     kfree((void*)p->trapframe);
+
+  // 释放 trapframe2
+  if (p->trapframe2)
+    kfree((void*)p->trapframe2);
+
   p->trapframe = 0;
+  p->trapframe2 = 0;
   if(p->pagetable)
     proc_freepagetable(p->pagetable, p->sz);
   p->pagetable = 0;
