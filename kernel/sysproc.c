@@ -7,6 +7,8 @@
 #include "spinlock.h"
 #include "proc.h"
 
+void backtrack();
+
 uint64
 sys_exit(void)
 {
@@ -55,6 +57,9 @@ sys_sbrk(void)
 uint64
 sys_sleep(void)
 {
+
+  backtrack();
+
   int n;
   uint ticks0;
 

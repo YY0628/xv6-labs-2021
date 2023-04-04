@@ -117,6 +117,7 @@ printf(char *fmt, ...)
 void
 panic(char *s)
 {
+  // backtrack();
   pr.locking = 0;
   printf("panic: ");
   printf(s);
@@ -131,4 +132,18 @@ printfinit(void)
 {
   initlock(&pr.lock, "pr");
   pr.locking = 1;
+}
+
+
+void backtrack(void)
+{
+  uint64 fp = r_fp();           // fp 保存当栈顶指针 + 16
+  uint64 base = PGROUNDUP(fp);  // 每个进程的栈只有1页，此处获得该进程栈底起始位置。 应该大于fp
+
+  printf("backtrack:\n");
+  while (fp < base)
+  {
+    printf("%p\n", *(uint64*)(fp - 8));
+    fp = *(uint64*)(fp - 16);
+  }
 }

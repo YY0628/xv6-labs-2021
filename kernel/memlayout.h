@@ -49,7 +49,7 @@
 
 // map the trampoline page to the highest address,
 // in both user and kernel space.
-#define TRAMPOLINE (MAXVA - PGSIZE)
+#define TRAMPOLINE (MAXVA - PGSIZE)         // trampoline.S 代码开始的位置。  用于从用户态跳转到内核态前的现场保护
 
 // map kernel stacks beneath the trampoline,
 // each surrounded by invalid guard pages.
@@ -64,4 +64,4 @@
 //   ...
 //   TRAPFRAME (p->trapframe, used by the trampoline)
 //   TRAMPOLINE (the same page as in the kernel)
-#define TRAPFRAME (TRAMPOLINE - PGSIZE)
+#define TRAPFRAME (TRAMPOLINE - PGSIZE)     // 保护现场的数据，trapframe 的地址固定
