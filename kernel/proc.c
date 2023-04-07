@@ -2,9 +2,9 @@
 #include "param.h"
 #include "memlayout.h"
 #include "riscv.h"
+#include "defs.h"
 #include "spinlock.h"
 #include "proc.h"
-#include "defs.h"
 
 struct cpu cpus[NCPU];
 
@@ -273,6 +273,10 @@ fork(void)
     release(&np->lock);
     return -1;
   }
+
+  // 用户栈首地址
+  // np->userstack = p->userstack;
+
   np->sz = p->sz;
 
   np->parent = p;

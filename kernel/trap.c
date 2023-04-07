@@ -65,7 +65,47 @@ usertrap(void)
     intr_on();
 
     syscall();
-  } else if((which_dev = devintr()) != 0){
+  } 
+
+  // 缺页错误
+  else if (r_scause() == 15 || r_scause() == 13) {
+    // printf("Page fault!\n");
+    // p->killed = 1;
+
+    uint64 va  = r_stval();
+
+    if (va >= p->sz) {
+      // printf("VM Address not valid!\n");
+      p->killed = 1;
+    }
+    else {
+      uint64 protectTop = PGROUNDDOWN(p->trapframe->sp);
+      uint64 stavalTop = PGROUNDUP(va);
+      if (stavalTop > protectTop)   // 用户VA TOP 必须 大于 守护页TOP
+      // if (stavalTop != protectTop)   // 用户VA TOP 必须 大于 守护页TOP
+      {
+        char* mem = kalloc();
+        if (mem != 0) {
+          memset(mem, 0, PGSIZE);
+          if(mappages(p->pagetable, PGROUNDDOWN(va), PGSIZE, (uint64)mem, PTE_W|PTE_X|PTE_R|PTE_U) != 0) {
+            printf("no page mapped!\n");
+            kfree(mem);
+            uvmdealloc(p->pagetable, PGROUNDDOWN(va), PGSIZE);
+            p->killed = 1;
+          }
+        } 
+        else  // == 时，说明 用户 va 已经到达 guard page。 
+        {
+          // printf("mem = 0 \n");
+          p->killed = 1;
+        }      
+      } else {
+        p->killed = 1;
+      }
+    }
+  } 
+
+  else if((which_dev = devintr()) != 0){
     // ok
   } else {
     printf("usertrap(): unexpected scause %p pid=%d\n", r_scause(), p->pid);

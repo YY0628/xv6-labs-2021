@@ -5,6 +5,8 @@
 #include "riscv.h"
 #include "defs.h"
 #include "fs.h"
+#include "spinlock.h"
+#include "proc.h"
 
 /*
  * the kernel's page table.
@@ -180,10 +182,14 @@ uvmunmap(pagetable_t pagetable, uint64 va, uint64 npages, int do_free)
     panic("uvmunmap: not aligned");
 
   for(a = va; a < va + npages*PGSIZE; a += PGSIZE){
-    if((pte = walk(pagetable, a, 0)) == 0)
-      panic("uvmunmap: walk");
-    if((*pte & PTE_V) == 0)
-      panic("uvmunmap: not mapped");
+    if((pte = walk(pagetable, a, 0)) == 0) {
+      // panic("uvmunmap: walk");
+      continue;
+    }
+    if((*pte & PTE_V) == 0) {
+      // panic("uvmunmap: not mapped");
+      continue;
+    }
     if(PTE_FLAGS(*pte) == PTE_V)
       panic("uvmunmap: not a leaf");
     if(do_free){
@@ -314,10 +320,14 @@ uvmcopy(pagetable_t old, pagetable_t new, uint64 sz)
   char *mem;
 
   for(i = 0; i < sz; i += PGSIZE){
-    if((pte = walk(old, i, 0)) == 0)
-      panic("uvmcopy: pte should exist");
-    if((*pte & PTE_V) == 0)
-      panic("uvmcopy: page not present");
+    if((pte = walk(old, i, 0)) == 0) {
+      // panic("uvmcopy: pte should exist");
+      continue;
+    }
+    if((*pte & PTE_V) == 0) {
+      // panic("uvmcopy: page not present");
+      continue;
+    }
     pa = PTE2PA(*pte);
     flags = PTE_FLAGS(*pte);
     if((mem = kalloc()) == 0)
@@ -359,8 +369,22 @@ copyout(pagetable_t pagetable, uint64 dstva, char *src, uint64 len)
   while(len > 0){
     va0 = PGROUNDDOWN(dstva);
     pa0 = walkaddr(pagetable, va0);
-    if(pa0 == 0)
-      return -1;
+    
+    /*
+      if(pte == 0)
+      if((*pte & PTE_V) == 0) 
+    */
+   // 处理以上两种情况
+    if(pa0 == 0) {
+      // return -1;
+      if (dstva >= myproc()->sz) // 虚拟地址错
+        return -1;
+      char* mem = kalloc();
+      pa0 = (uint64) mem;
+      memset(mem, 0, PGSIZE);
+      mappages(pagetable, va0, PGSIZE, pa0, PTE_W|PTE_X|PTE_W|PTE_U);   // 读写执行，用户页
+    }
+
     n = PGSIZE - (dstva - va0);
     if(n > len)
       n = len;
@@ -384,8 +408,21 @@ copyin(pagetable_t pagetable, char *dst, uint64 srcva, uint64 len)
   while(len > 0){
     va0 = PGROUNDDOWN(srcva);
     pa0 = walkaddr(pagetable, va0);
-    if(pa0 == 0)
-      return -1;
+    
+    /*
+      if(pte == 0)
+      if((*pte & PTE_V) == 0) 
+    */
+   // 处理以上两种情况
+    if(pa0 == 0) {
+      // return -1;
+      if (srcva >= myproc()->sz) // 虚拟地址错
+        return -1;
+      char* mem = kalloc();
+      pa0 = (uint64) mem;
+      memset(mem, 0, PGSIZE);
+      mappages(pagetable, va0, PGSIZE, pa0, PTE_W|PTE_X|PTE_W|PTE_U);   // 读写执行，用户页
+    }
     n = PGSIZE - (srcva - va0);
     if(n > len)
       n = len;
@@ -439,4 +476,47 @@ copyinstr(pagetable_t pagetable, char *dst, uint64 srcva, uint64 max)
   } else {
     return -1;
   }
+}
+
+
+void recerseTBL(pagetable_t pagetable, int level)
+{
+  char *prefix;
+  switch (level)
+  {
+    case 2:
+      prefix = "..";
+      break;
+    case 1:
+      prefix = ".. ..";
+      break;
+    case 0:
+      prefix = ".. .. ..";
+      break;
+    default:
+      prefix = ".. .. ..";
+      break;
+  }
+
+  for (int i=0; i<512; i++)
+  {
+    pte_t pte = pagetable[i];
+    if ( pte & PTE_V )
+    {
+      uint64 pa = PTE2PA(pte);
+      printf("%s%d: pte %p pa %p\n", prefix, i, pte, pa);
+      if ( (pte & (PTE_R | PTE_W | PTE_X)) == 0 ) // 有下级
+        recerseTBL((pagetable_t)pa, level-1);
+    }
+  }
+
+} 
+
+
+// 打印页表
+void vmprint(pagetable_t pagetable)
+{
+  printf("page table %p\n", pagetable);
+  recerseTBL(pagetable, 2);
+  return ;
 }

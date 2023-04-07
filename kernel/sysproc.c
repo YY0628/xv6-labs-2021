@@ -46,9 +46,28 @@ sys_sbrk(void)
 
   if(argint(0, &n) < 0)
     return -1;
+
+  // 分配新的虚拟内存地址  
   addr = myproc()->sz;
-  if(growproc(n) < 0)
-    return -1;
+  uint64 newSize = myproc()->sz + n;
+
+  if (newSize >= MAXVA)   // 分配内存超过最大虚拟内存便不做处理
+    return addr;
+
+  if (n < 0)
+  {
+    if (newSize > addr )   // 缩小的量超过了现有的量，则将全部虚拟内存回收
+    {
+      newSize = 0;
+      uvmunmap(myproc()->pagetable, 0, PGROUNDUP(addr) / PGSIZE, 1); 
+    }
+    else    // 正常缩小
+    {
+      uvmunmap(myproc()->pagetable, PGROUNDUP(newSize), (PGROUNDUP(addr) - PGROUNDUP(newSize)) / PGSIZE, 1); 
+    }
+  }
+
+  myproc()->sz = newSize;
   return addr;
 }
 
