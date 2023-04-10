@@ -21,22 +21,42 @@ struct run {
 struct {
   struct spinlock lock;
   struct run *freelist;
+  struct spinlock reflock;
+  uint *refcount;             // 引用计数存放在 end 处
 } kmem;
 
 void
 kinit()
 {
   initlock(&kmem.lock, "kmem");
-  freerange(end, (void*)PHYSTOP);
+  initlock(&kmem.reflock, "kmemref");
+
+  /* 计算出最大需要对多少内存进行计数 */
+  uint64 rc_pages = ( (PHYSTOP - (uint64)end) >> 12 ) + 1;  // 需要计数的物理页总数
+  rc_pages = (( rc_pages * sizeof(uint) ) >> 12) + 1;       // 需要用来计数的页数
+  kmem.refcount = (uint*)end;
+  uint64 rc_offset = rc_pages << 12;      // 用来计数的物理空间
+
+  freerange(end + rc_offset, (void*)PHYSTOP);   // 用作引用计数的那部分物理内存便不用再计入了
 }
 
+// 物理页的编号
+uint kgetRefIndex(void* pa)
+{
+  return ( (char*)pa - (char*)PGROUNDUP((uint64)end) ) >> 12;   // UP正好对应索引
+}
+
+
+// 创建空闲物理内存链表
 void
 freerange(void *pa_start, void *pa_end)
 {
   char *p;
-  p = (char*)PGROUNDUP((uint64)pa_start);
-  for(; p + PGSIZE <= (char*)pa_end; p += PGSIZE)
+  p = (char*)PGROUNDUP((uint64)pa_start);   // 从 0 开始计算，向上取整，正好等于正确的索引
+  for(; p + PGSIZE <= (char*)pa_end; p += PGSIZE) {
+    kmem.refcount[kgetRefIndex((void*)p)] = 1;
     kfree(p);
+  }
 }
 
 // Free the page of physical memory pointed at by v,
@@ -50,6 +70,15 @@ kfree(void *pa)
 
   if(((uint64)pa % PGSIZE) != 0 || (char*)pa < end || (uint64)pa >= PHYSTOP)
     panic("kfree");
+
+  // 引用计数-1，不为0，则不释放内存
+  acquire(&kmem.lock);
+  if (--kmem.refcount[kgetRefIndex(pa)]) {
+    release(&kmem.lock);
+    return ;
+  }
+  release(&kmem.lock);
+
 
   // Fill with junk to catch dangling refs.
   memset(pa, 1, PGSIZE);
@@ -72,11 +101,34 @@ kalloc(void)
 
   acquire(&kmem.lock);
   r = kmem.freelist;
-  if(r)
+  if(r) {
     kmem.freelist = r->next;
+    kmem.refcount[kgetRefIndex((void*)r)] = 1;
+  }
   release(&kmem.lock);
 
   if(r)
     memset((char*)r, 5, PGSIZE); // fill with junk
   return (void*)r;
+}
+
+
+// 获取物理地址所在物理页的引用计数
+uint kgetRef(void *pa) {
+  return kmem.refcount[kgetRefIndex(pa)];
+}
+
+// pa所在物理页引用计数+1
+void kaddRef(void *pa) {
+  kmem.refcount[kgetRefIndex(pa)]++;
+}
+
+// 引用计数加锁
+inline void acquire_refCnt() {
+  acquire(&kmem.reflock);
+}
+
+// 引用计数解锁
+inline void release_refCnt() {
+  release(&kmem.reflock);
 }

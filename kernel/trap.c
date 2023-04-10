@@ -14,6 +14,8 @@ extern char trampoline[], uservec[], userret[];
 // in kernelvec.S, calls kerneltrap().
 void kernelvec();
 
+pte_t* walk(pagetable_t pagetable, uint64 va, int alloc);
+
 extern int devintr();
 
 void
@@ -65,7 +67,61 @@ usertrap(void)
     intr_on();
 
     syscall();
-  } else if((which_dev = devintr()) != 0){
+  } 
+
+  // 加载页面错误  
+  else if (r_scause() == 15) {
+
+    uint64 va = PGROUNDDOWN(r_stval());
+    pte_t *pte;
+
+    if (va >= MAXVA) {
+      printf("usertap(): va is larger than MAXVA!\n");
+      goto end;
+    }
+    if (va > p->sz) {
+      printf("vusertap(): a is larger than sz!\n");
+      goto end;
+    }
+    if ( (pte=walk(p->pagetable, va, 0)) == 0) {
+      printf("usertap(): page not found!\n");
+      goto end;
+    }
+    if ( ((*pte) & PTE_COW) == 0 || ((*pte) & PTE_R) == 0 || ((*pte) & PTE_V) == 0) {
+      printf("usertap(): pte not exist or it's not cow page!\n");
+      goto end;
+    }
+
+    // 分配物理内存
+    uint64 pa = PTE2PA(*pte);
+    acquire_refCnt();
+    uint refcnt = kgetRef((void*)pa);
+    if (refcnt == 1) {  // 此时引用计数为1，直接使用。可能情况：父进程解除了引用
+      *pte = ((*pte) & (~PTE_COW)) | PTE_W;   // 标记为可写，相当于重新独占
+    } else {    // 分配内存
+      char* mem = kalloc();
+      if (mem == 0) {
+        printf("usertap(): mem alloc fault!\n");
+        p->killed = 1;
+        release_refCnt();
+        goto end;
+      }
+      // 复制内存
+      memmove(mem, (void*)pa, PGSIZE);    // TODO
+      uint flag = (PTE_FLAGS(*pte) | PTE_W) & (~PTE_COW);   // 新页面标志为可写 非cow
+      if (mappages(p->pagetable, va, PGSIZE, (uint64)mem, flag) == -1) {
+        kfree(mem);
+        printf("usertap(): cannot map!\n");
+        p->killed = 1;
+        release_refCnt();
+        goto end;
+      }
+
+      kfree((void*)(pa));   // 旧引用计数-1
+    }
+    release_refCnt();     // 解锁位置注意
+  } 
+  else if((which_dev = devintr()) != 0){
     // ok
   } else {
     printf("usertrap(): unexpected scause %p pid=%d\n", r_scause(), p->pid);
@@ -73,6 +129,7 @@ usertrap(void)
     p->killed = 1;
   }
 
+end:
   if(p->killed)
     exit(-1);
 

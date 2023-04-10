@@ -5,6 +5,7 @@
 #include "riscv.h"
 #include "defs.h"
 #include "fs.h"
+// #include "riscv.h"
 
 /*
  * the kernel's page table.
@@ -156,8 +157,8 @@ mappages(pagetable_t pagetable, uint64 va, uint64 size, uint64 pa, int perm)
   for(;;){
     if((pte = walk(pagetable, a, 1)) == 0)
       return -1;
-    if(*pte & PTE_V)
-      panic("remap");
+    // if(*pte & PTE_V)
+    //   panic("remap");
     *pte = PA2PTE(pa) | perm | PTE_V;
     if(a == last)
       break;
@@ -311,22 +312,26 @@ uvmcopy(pagetable_t old, pagetable_t new, uint64 sz)
   pte_t *pte;
   uint64 pa, i;
   uint flags;
-  char *mem;
+  // char *mem;
 
   for(i = 0; i < sz; i += PGSIZE){
     if((pte = walk(old, i, 0)) == 0)
       panic("uvmcopy: pte should exist");
     if((*pte & PTE_V) == 0)
       panic("uvmcopy: page not present");
-    pa = PTE2PA(*pte);
+    *pte = ( (*pte) & (~PTE_W) ) | PTE_COW;
     flags = PTE_FLAGS(*pte);
-    if((mem = kalloc()) == 0)
-      goto err;
-    memmove(mem, (char*)pa, PGSIZE);
-    if(mappages(new, i, PGSIZE, (uint64)mem, flags) != 0){
-      kfree(mem);
+    pa = PTE2PA(*pte);
+    // if((mem = kalloc()) == 0)
+    //   goto err;
+    // memmove(mem, (char*)pa, PGSIZE);
+    if(mappages(new, i, PGSIZE, pa, flags) != 0){
+      // kfree(mem);
       goto err;
     }
+
+    // 增加对应物理页的引用计数
+    kaddRef((void*)pa);
   }
   return 0;
 
@@ -355,9 +360,50 @@ int
 copyout(pagetable_t pagetable, uint64 dstva, char *src, uint64 len)
 {
   uint64 n, va0, pa0;
+  pte_t *pte;
 
   while(len > 0){
     va0 = PGROUNDDOWN(dstva);
+
+    /*  分配  */
+    if (va0 >= MAXVA) 
+      return -1;
+    if ( (pte=walk(pagetable, va0, 0)) == 0)
+      return -1;
+    if ( ((*pte) & PTE_U) == 0 || ((*pte) & PTE_V) == 0) 
+      return -1;
+
+    // 分配物理内存
+    uint64 pa = PTE2PA(*pte);
+    if ( ((*pte) & PTE_COW) || ((*pte) & PTE_W) == 0) {
+      acquire_refCnt();
+      uint refcnt = kgetRef((void*)pa);
+      if (refcnt == 1) {  // 此时引用计数为1，直接使用。可能情况：父进程解除了引用
+        *pte = ((*pte) & (~PTE_COW)) | PTE_W;   // 标记为可写，相当于重新独占
+      } else {    // 分配内存
+        char* mem = kalloc();
+        if (mem == 0) {
+          printf("copyout(): mem alloc fault!\n");
+          release_refCnt();
+          return -1;
+        }
+        // 复制内存
+        memmove(mem, (void*)pa, PGSIZE);    // TODO
+        uint flag = (PTE_FLAGS(*pte) | PTE_W) & (~PTE_COW);   // 新页面标志为可写 非cow
+        if (mappages(pagetable, va0, PGSIZE, (uint64)mem, flag) == -1) {
+          kfree(mem);
+          printf("copyout(): cannot map!\n");
+          release_refCnt();
+          return -1;
+        }
+
+        kfree((void*)(pa));   // 旧引用计数-1
+      }
+      release_refCnt();
+    }
+
+
+
     pa0 = walkaddr(pagetable, va0);
     if(pa0 == 0)
       return -1;

@@ -64,6 +64,16 @@ void*           kalloc(void);
 void            kfree(void *);
 void            kinit(void);
 
+// 获取物理地址所在物理页的引用计数
+uint kgetRef(void *pa);
+// pa所在物理页引用计数+1
+void            kaddRef(void *pa);
+// 引用计数加锁
+void            acquire_refCnt();
+// 引用计数解锁
+void            release_refCnt();
+
+
 // log.c
 void            initlog(int, struct superblock*);
 void            log_write(struct buf*);
