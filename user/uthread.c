@@ -101,7 +101,7 @@ thread_create(void (*func)())
   // YOUR CODE HERE
   // 设置返回地址，栈指针
   t->contex.ra = (uint64)func;
-  t->contex.sp = (uint64)(t->stack+STACK_SIZE-1);
+  t->contex.sp = (uint64)(t->stack+STACK_SIZE-1);   //  栈从高地址向下生长
 }
 
 void 
