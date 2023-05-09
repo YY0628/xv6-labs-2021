@@ -6,3 +6,6 @@ lab1 Uthread: switching between threads
 
 lab2 Using threads
 使用互斥锁控制多线程写
+
+lab3 Barrier
+条件变量
